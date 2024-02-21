@@ -157,11 +157,15 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
             builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
               if (!snapshot.hasData) return CircularProgressIndicator();
 
-              _createMarkersFromData(snapshot.data!).then((markers) {
-                setState(() {
-                  _markers = {...markers, ...shopMarkers};
+              try{
+                _createMarkersFromData(snapshot.data!).then((markers) {
+                  setState(() {
+                    _markers = {...markers, ...shopMarkers};
+                  });
                 });
-              });
+              }catch (e){
+                print("W100 ${e.toString()}");
+              }
 
               return GoogleMap(
                 onMapCreated: (GoogleMapController controller) {
