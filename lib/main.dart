@@ -57,8 +57,7 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
   bool _added = false;
   StreamSubscription<loc.LocationData>? _locationSubscription;
   Set<Marker> _markers = {};
-  late Future<List<Shop>> shoplist;
-
+  //late Future<List<Shop>> shoplist;
 
 
   @override
@@ -68,14 +67,15 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     location = loc.Location();
     WidgetsBinding.instance!.addObserver(this);
     _initLocationTracking();
-    shoplist = fetchShops();
+    //shoplist = fetchShops();
   }
 
   void _initLocationTracking() {
     _locationSubscription = location.onLocationChanged.listen(
           (loc.LocationData currentLocation) {
         if (_added) {
-          _updateMarkerPosition(currentLocation.latitude!, currentLocation.longitude!);
+          _updateMarkerPosition(
+              currentLocation.latitude!, currentLocation.longitude!);
         }
       },
     );
@@ -104,10 +104,12 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
   }
 
   Future<List<Shop>> fetchShops() async {
-    final response = await get(Uri.parse('https://g77e7c85ff59092-db17lrv.adb.ap-singapore-1.oraclecloudapps.com/ords/metaxperts/shoploc/get/')).timeout(const Duration(seconds: 10));
+    final response = await get(Uri.parse(
+        'https://g77e7c85ff59092-db17lrv.adb.ap-singapore-1.oraclecloudapps.com/ords/metaxperts/shoploc/get/'))
+        .timeout(const Duration(seconds: 10));
     if (response.statusCode == 200) {
       var shopJson = jsonDecode(response.body);
-      var shopsData =  shopJson['items'];
+      var shopsData = shopJson['items'];
       return shopsData.map<Shop>((shop) => Shop.fromJson(shop)).toList();
     } else {
       throw Exception('Failed to load shops');
@@ -119,7 +121,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
       return Marker(
         markerId: MarkerId(doc.id),
         position: LatLng(doc['latitude'], doc['longitude']),
-        icon: await CustomIcon(symbol: doc['name'], color: Colors.blue).toBitmapDescriptor(
+        icon: await CustomIcon(symbol: doc['name'], color: Colors.blue)
+            .toBitmapDescriptor(
             logicalSize: const Size(150, 150), imageSize: const Size(150, 150)
         ),
         infoWindow: InfoWindow(title: doc['name']),
@@ -131,56 +134,45 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
   }
 
   Set<Marker> shopsMarkers(List<Shop> shops) {
-    return shops.where((shop) => shop.latitude != null && shop.longitude != null).map((shop) => Marker(
-      markerId: MarkerId(shop.name!),
-      position: LatLng(shop.latitude!, shop.longitude!),
-      icon: BitmapDescriptor.defaultMarker,
-      infoWindow: InfoWindow(title: shop.name.toString())
-    )).toSet();
+    return shops.where((shop) =>
+    shop.latitude != null && shop.longitude != null).map((shop) =>
+        Marker(
+            markerId: MarkerId(shop.name!),
+            position: LatLng(shop.latitude!, shop.longitude!),
+            icon: BitmapDescriptor.defaultMarker,
+            infoWindow: InfoWindow(title: shop.name.toString())
+        )).toSet();
   }
 
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Shop>>(
-      future: shoplist,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return CircularProgressIndicator();
-        } else if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}');
-        } else {
-          var shopMarkers = shopsMarkers(snapshot.data!);
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance.collection('location').snapshots(),
+      builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+        if (!snapshot.hasData) return CircularProgressIndicator();
 
-          return StreamBuilder(
-            stream: FirebaseFirestore.instance.collection('location').snapshots(),
-            builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-              if (!snapshot.hasData) return CircularProgressIndicator();
-
-              try{
-                _createMarkersFromData(snapshot.data!).then((markers) {
-                  setState(() {
-                    _markers = {...markers, ...shopMarkers};
-                  });
-                });
-              }catch (e){
-                print("W100 ${e.toString()}");
-              }
-
-              return GoogleMap(
-                onMapCreated: (GoogleMapController controller) {
-                  _controller = controller;
-                },
-                markers: _markers,
-                initialCameraPosition: CameraPosition(
-                  target: _markers.first.position,
-                  zoom: 13,
-                ),
-                // other properties...
-              );
-            },
-          );
+        try {
+          _createMarkersFromData(snapshot.data!).then((markers) {
+            setState(() {
+              _markers = {...markers};
+            });
+          });
+        } catch (e) {
+          print("W100 ${e.toString()}");
         }
+
+        return GoogleMap(
+          onMapCreated: (GoogleMapController controller) {
+            _controller = controller;
+          },
+          markers: _markers,
+          initialCameraPosition: CameraPosition(
+            target: _markers.first.position,
+            zoom: 13,
+          ),
+          // other properties...
+        );
       },
     );
   }
